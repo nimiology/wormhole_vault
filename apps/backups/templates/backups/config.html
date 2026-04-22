@@ -1,0 +1,150 @@
+{% extends "backups/base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Settings</h1>
+</div>
+
+<!-- Schedule Info -->
+<div class="detail-card detail-card-wide">
+    <h3>Schedule & Retention</h3>
+    <dl class="detail-list">
+        <div class="dl-row">
+            <dt>Backup Schedule</dt>
+            <dd>Daily at <strong>{{ schedule_hour|stringformat:"02d" }}:{{ schedule_minute|stringformat:"02d" }}</strong></dd>
+        </div>
+        <div class="dl-row">
+            <dt>Retention Period</dt>
+            <dd><strong>{{ retention_days }}</strong> days</dd>
+        </div>
+        <div class="dl-row">
+            <dt>Configure</dt>
+            <dd class="text-muted">Edit <code>.env</code> file and restart containers to change schedule.</dd>
+        </div>
+    </dl>
+</div>
+
+<!-- Targets -->
+<div class="section-header">
+    <h2>Backup Targets</h2>
+    <a href="{% url 'admin:backups_backuptarget_add' %}" class="btn btn-primary btn-sm">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        Add Target
+    </a>
+</div>
+
+<div class="table-container">
+    <table class="data-table" id="targets-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>SSH Host</th>
+                <th>SSH User</th>
+                <th>Database</th>
+                <th>Container</th>
+                <th>Active</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for target in targets %}
+            <tr id="target-row-{{ target.pk }}">
+                <td><strong>{{ target.name }}</strong></td>
+                <td><code>{{ target.ssh_host }}:{{ target.ssh_port }}</code></td>
+                <td>{{ target.ssh_user }}</td>
+                <td><code>{{ target.db_name }}</code></td>
+                <td>
+                    {% if target.db_container %}
+                    <code>{{ target.db_container }}</code>
+                    {% else %}
+                    <span class="text-muted">Direct</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if target.is_active %}
+                    <span class="badge badge-success">Active</span>
+                    {% else %}
+                    <span class="badge badge-muted">Inactive</span>
+                    {% endif %}
+                </td>
+                <td class="actions-cell">
+                    <button
+                        class="btn btn-sm btn-ghost"
+                        onclick="testConnection({{ target.pk }}, this)"
+                        id="test-btn-{{ target.pk }}"
+                    >
+                        Test SSH
+                    </button>
+                    <a href="{% url 'admin:backups_backuptarget_change' target.pk %}" class="btn-icon" title="Edit">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="empty-state">
+                    <p>No targets configured</p>
+                    <span>Add a backup target using the button above or the Django admin.</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- SSH Key Info -->
+<div class="detail-card detail-card-wide" style="margin-top: 2rem;">
+    <h3>SSH Key Setup</h3>
+    <div class="help-text">
+        <ol>
+            <li>Generate an SSH key on the backup PC:<br>
+                <code>ssh-keygen -t ed25519 -f ./ssh_keys/id_ed25519 -N ""</code>
+            </li>
+            <li>Copy the public key to the production server:<br>
+                <code>ssh-copy-id -i ./ssh_keys/id_ed25519.pub user@your-server</code>
+            </li>
+            <li>The private key is mounted into the container at <code>/app/ssh_keys/id_ed25519</code></li>
+        </ol>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function testConnection(targetId, btn) {
+    const originalText = btn.textContent;
+    btn.textContent = 'Testing...';
+    btn.disabled = true;
+
+    fetch('{% url "test-connection" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': '{{ csrf_token }}',
+        },
+        body: `target_id=${targetId}`,
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.textContent = data.ok ? '✓ Connected' : '✗ Failed';
+        btn.classList.add(data.ok ? 'btn-success-text' : 'btn-danger-text');
+        if (!data.ok) alert('Connection failed: ' + data.message);
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+            btn.classList.remove('btn-success-text', 'btn-danger-text');
+        }, 3000);
+    })
+    .catch(() => {
+        btn.textContent = '✗ Error';
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }, 3000);
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends "backups/base.html" %}
+
+{% block title %}Backup #{{ backup.pk }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="breadcrumb">
+        <a href="{% url 'dashboard' %}">Dashboard</a>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        <span>Backup #{{ backup.pk }}</span>
+    </div>
+</div>
+
+<div class="detail-grid">
+    <!-- Status Card -->
+    <div class="detail-card detail-card-wide">
+        <div class="detail-card-header">
+            <h2>
+                <span class="badge badge-{{ backup.status }} badge-lg">
+                    {% if backup.status == 'running' %}<div class="pulse-dot-sm"></div>{% endif %}
+                    {{ backup.get_status_display }}
+                </span>
+            </h2>
+            <div class="detail-actions">
+                {% if backup.status == 'success' %}
+                <a href="{% url 'backup-download' backup.pk %}" class="btn btn-primary btn-sm">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Download
+                </a>
+                {% endif %}
+                <form method="post" action="{% url 'backup-delete' backup.pk %}" class="inline-form" onsubmit="return confirm('Delete this backup?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path></svg>
+                        Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metadata -->
+    <div class="detail-card">
+        <h3>Details</h3>
+        <dl class="detail-list">
+            <div class="dl-row">
+                <dt>Target</dt>
+                <dd>{{ backup.target.name }}</dd>
+            </div>
+            <div class="dl-row">
+                <dt>Server</dt>
+                <dd><code>{{ backup.target.ssh_host }}</code></dd>
+            </div>
+            <div class="dl-row">
+                <dt>Database</dt>
+                <dd><code>{{ backup.target.db_name }}</code></dd>
+            </div>
+            <div class="dl-row">
+                <dt>Trigger</dt>
+                <dd>
+                    <span class="trigger-badge trigger-{{ backup.triggered_by }}">
+                        {{ backup.get_triggered_by_display }}
+                    </span>
+                </dd>
+            </div>
+        </dl>
+    </div>
+
+    <div class="detail-card">
+        <h3>File Info</h3>
+        <dl class="detail-list">
+            <div class="dl-row">
+                <dt>Filename</dt>
+                <dd><code>{{ backup.filename|default:"—" }}</code></dd>
+            </div>
+            <div class="dl-row">
+                <dt>Size</dt>
+                <dd>{{ backup.file_size_display }}</dd>
+            </div>
+            <div class="dl-row">
+                <dt>Duration</dt>
+                <dd>{{ backup.duration_display }}</dd>
+            </div>
+            <div class="dl-row">
+                <dt>Created</dt>
+                <dd>{{ backup.created_at|date:"M d, Y H:i:s" }}</dd>
+            </div>
+            {% if backup.started_at %}
+            <div class="dl-row">
+                <dt>Started</dt>
+                <dd>{{ backup.started_at|date:"H:i:s" }}</dd>
+            </div>
+            {% endif %}
+            {% if backup.completed_at %}
+            <div class="dl-row">
+                <dt>Completed</dt>
+                <dd>{{ backup.completed_at|date:"H:i:s" }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+    </div>
+</div>
+
+<!-- Log Output -->
+{% if backup.log %}
+<div class="log-container">
+    <div class="log-header">
+        <h3>Backup Log</h3>
+        <button class="btn btn-sm btn-ghost" onclick="copyLog()" id="copy-log-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+            Copy
+        </button>
+    </div>
+    <pre class="log-output" id="log-output">{{ backup.log }}</pre>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function copyLog() {
+    const log = document.getElementById('log-output').textContent;
+    navigator.clipboard.writeText(log).then(() => {
+        const btn = document.getElementById('copy-log-btn');
+        btn.innerHTML = '✓ Copied';
+        setTimeout(() => {
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg> Copy';
+        }, 2000);
+    });
+}
+
+{% if backup.status == 'running' %}
+setTimeout(() => window.location.reload(), 5000);
+{% endif %}
+</script>
+{% endblock %}

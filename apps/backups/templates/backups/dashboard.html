@@ -1,0 +1,179 @@
+{% extends "backups/base.html" %}
+{% load humanize %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <div class="header-actions">
+        {% if targets %}
+        <form method="post" action="{% url 'backup-trigger' %}" class="inline-form">
+            {% csrf_token %}
+            <select name="target_id" class="select-target" id="target-select">
+                {% for target in targets %}
+                <option value="{{ target.pk }}">{{ target.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary" id="backup-now-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                Backup Now
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon stat-icon-total">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+        </div>
+        <div class="stat-info">
+            <span class="stat-value">{{ total_backups }}</span>
+            <span class="stat-label">Total Backups</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon stat-icon-success">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        </div>
+        <div class="stat-info">
+            <span class="stat-value">{{ successful_backups }}</span>
+            <span class="stat-label">Successful</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon stat-icon-failed">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+        </div>
+        <div class="stat-info">
+            <span class="stat-value">{{ failed_backups }}</span>
+            <span class="stat-label">Failed</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon stat-icon-size">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+        </div>
+        <div class="stat-info">
+            <span class="stat-value">{{ total_size }}</span>
+            <span class="stat-label">Total Size</span>
+        </div>
+    </div>
+</div>
+
+<!-- Info Bar -->
+<div class="info-bar">
+    <div class="info-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span>Next scheduled: <strong>{{ schedule_hour|stringformat:"02d" }}:{{ schedule_minute|stringformat:"02d" }}</strong> daily</span>
+    </div>
+    {% if last_success %}
+    <div class="info-item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        <span>Last success: <strong>{{ last_success.completed_at|timesince }} ago</strong></span>
+    </div>
+    {% endif %}
+    {% if running_count %}
+    <div class="info-item info-running">
+        <div class="pulse-dot"></div>
+        <span><strong>{{ running_count }}</strong> backup{{ running_count|pluralize }} running</span>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Backup Table -->
+<div class="table-container">
+    <table class="data-table" id="backups-table">
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Target</th>
+                <th>Filename</th>
+                <th>Size</th>
+                <th>Duration</th>
+                <th>Trigger</th>
+                <th>Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for backup in backups %}
+            <tr class="backup-row" id="backup-row-{{ backup.pk }}">
+                <td>
+                    <span class="badge badge-{{ backup.status }}">
+                        {% if backup.status == 'running' %}<div class="pulse-dot-sm"></div>{% endif %}
+                        {{ backup.get_status_display }}
+                    </span>
+                </td>
+                <td>{{ backup.target.name }}</td>
+                <td class="filename-cell">
+                    {% if backup.filename %}
+                    <code>{{ backup.filename }}</code>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td>{{ backup.file_size_display }}</td>
+                <td>{{ backup.duration_display }}</td>
+                <td>
+                    <span class="trigger-badge trigger-{{ backup.triggered_by }}">
+                        {{ backup.get_triggered_by_display }}
+                    </span>
+                </td>
+                <td>{{ backup.created_at|date:"M d, Y H:i" }}</td>
+                <td class="actions-cell">
+                    <a href="{% url 'backup-detail' backup.pk %}" class="btn-icon" title="View details">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </a>
+                    {% if backup.status == 'success' %}
+                    <a href="{% url 'backup-download' backup.pk %}" class="btn-icon" title="Download">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    </a>
+                    {% endif %}
+                    <form method="post" action="{% url 'backup-delete' backup.pk %}" class="inline-form" onsubmit="return confirm('Delete this backup?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-icon btn-icon-danger" title="Delete">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path></svg>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="empty-state">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                    <p>No backups yet</p>
+                    <span>Configure a target and click "Backup Now" to get started.</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if is_paginated %}
+<div class="pagination">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-sm">&laquo; Previous</a>
+    {% endif %}
+    <span class="page-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}" class="btn btn-sm">Next &raquo;</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Auto-refresh if there are running backups
+    {% if running_count %}
+    setTimeout(() => window.location.reload(), 10000);
+    {% endif %}
+</script>
+{% endblock %}
