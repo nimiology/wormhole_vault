@@ -1,0 +1,30 @@
+# Python
+*.pyc
+__pycache__/
+*.py[cod]
+.venv/
+.env/
+venv/
+ENV/
+
+# Django
+db.sqlite3
+staticfiles/
+
+# Environment
+.env
+
+# Backups (stored locally, don't commit)
+backups/
+
+# SSH Keys (never commit!)
+ssh_keys/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
