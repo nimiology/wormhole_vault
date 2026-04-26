@@ -2,13 +2,8 @@ FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV PIP_INDEX_URL=https://mirror-pypi.runflare.com/simple
 
 WORKDIR /app
-
-# Use Iranian mirrors for apt
-RUN sed -i 's|deb.debian.org|mirror.arvancloud.ir|g' /etc/apt/sources.list.d/* /etc/apt/sources.list 2>/dev/null || true && \
-    sed -i 's|security.debian.org|mirror.arvancloud.ir|g' /etc/apt/sources.list.d/* /etc/apt/sources.list 2>/dev/null || true
 
 # Install system deps: SSH client + pg_dump (version 15 to match production)
 RUN apt-get update -o Acquire::Check-Valid-Until=false \
