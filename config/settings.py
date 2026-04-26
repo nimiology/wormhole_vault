@@ -1,5 +1,5 @@
 """
-Django settings for the Backup System.
+Django settings for Wormhole Vault.
 """
 import os
 from pathlib import Path
